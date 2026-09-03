@@ -1,5 +1,97 @@
 'use client';
-import Link from 'next/link'; import { useParams } from 'next/navigation'; import { useState } from 'react'; import { ArrowLeft, Camera, CheckCircle2, MapPin, SlidersHorizontal } from 'lucide-react'; import { AppShell } from '@/components/app-shell'; import { BeforeAfter } from '@/components/before-after'; import { CaptureSheet } from '@/components/capture-sheet'; import { appendPhotoRecord, filterPhotoRecords, getPairedPhotos } from '@/lib/evidence'; import { photos, projects } from '@/lib/mock-data'; import type { PhotoRecord } from '@/types/domain';
-const tags = ['All', 'Pre-Cover', 'Firestop Inspection', 'JCT Variation', 'Sub-base', 'Daily Progress'];
 
-export default function ProjectPage() { const params = useParams<{ id: string }>(); const project = projects.find(item => item.id === params.id); const [filter, setFilter] = useState('All'); const [capture, setCapture] = useState(false); const [localRecords, setLocalRecords] = useState<PhotoRecord[]>(() => photos.filter(item => item.projectId === params.id)); if (!project) return <div/>; const records = filterPhotoRecords(localRecords, filter as 'All' | PhotoRecord['tags'][number]); const pair = getPairedPhotos(localRecords, project.id); return <AppShell><div className="min-h-screen px-5 py-6 pb-28 lg:px-10 lg:py-10"><div className="mx-auto max-w-6xl"><Link href="/" className="flex items-center gap-2 text-sm font-bold text-ink/55"><ArrowLeft size={16}/> All sites</Link><div className="mt-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><div className="flex items-center gap-3"><span className="rounded-lg bg-mint px-2 py-1 text-xs font-black">{project.code}</span><span className="flex items-center gap-1 text-xs font-bold text-ink/45"><MapPin size={13}/> {project.address}</span></div><h2 className="mt-3 text-3xl font-black tracking-tight">{project.name}</h2><p className="mt-1 text-sm text-ink/55">Client: {project.clientName} · {project.photoCount + localRecords.length - photos.filter(item => item.projectId === project.id).length} photo records</p></div><button onClick={() => setCapture(true)} className="flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-black text-white"><Camera size={18}/> Add photo</button></div><div className="mt-8 rounded-2xl bg-ink p-5 text-white sm:flex sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-white/55">Project progress</p><p className="mt-1 text-2xl font-black">{project.progress}% complete</p></div><div className="mt-4 h-2 w-full rounded-full bg-white/15 sm:mt-0 sm:w-64"><div className="h-full rounded-full bg-lime" style={{ width: `${project.progress}%` }}/></div></div>{pair ? <div className="mt-8 rounded-2xl border border-ink/10 bg-white p-4"><div className="mb-3 flex items-center justify-between"><p className="text-xs font-black uppercase tracking-wider text-ink/45">Selected project comparison</p><span className="rounded-full bg-mint px-2 py-1 text-[10px] font-black">{pair.before.location}</span></div><BeforeAfter before={pair.before.image} after={pair.after.image}/></div> : <div className="mt-8 rounded-2xl border border-dashed border-ink/20 p-8 text-center text-sm text-ink/50">No before / after pair has been added to this project yet.</div>}<div className="mt-8 flex items-center gap-2 overflow-x-auto pb-2"><SlidersHorizontal size={17} className="mr-1 shrink-0 text-ink/45"/>{tags.map(tag => <button key={tag} onClick={() => setFilter(tag)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-black ${filter === tag ? 'bg-ink text-white' : 'border border-ink/10 bg-white text-ink/55'}`}>{tag}</button>)}</div><div className="mt-5 space-y-4">{records.map(record => <article key={record.id} className="overflow-hidden rounded-2xl border border-ink/10 bg-white"><div className="grid md:grid-cols-[280px_1fr]"><img src={record.image} alt="Construction evidence" className="h-56 w-full object-cover md:h-full"/><div className="p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-wider text-ink/45">{record.timestamp} · {record.location}</p><h3 className="mt-2 font-black">{record.note}</h3></div><CheckCircle2 size={19} className={`shrink-0 ${record.syncStatus === 'pending' ? 'text-amber-500' : 'text-emerald-600'}`}/></div><p className="mt-4 text-xs text-ink/55">Captured by <strong className="text-ink">{record.capturedBy}</strong>, {record.role}</p><div className="mt-4 flex flex-wrap gap-2">{record.tags.map(tag => <span key={tag} className="rounded-md bg-mint px-2 py-1 text-[10px] font-black">{tag}</span>)}<span className="rounded-md bg-ink/5 px-2 py-1 text-[10px] font-bold text-ink/50">{record.syncStatus === 'synced' ? 'Synced' : 'Local demo · pending upload'}</span></div></div></div></article>)}</div>{records.length === 0 && <div className="rounded-2xl border border-dashed border-ink/20 p-12 text-center text-sm text-ink/50">No records match this filter.</div>}</div></div>{capture && <CaptureSheet projectId={project.id} onClose={() => setCapture(false)} onSaved={record => setLocalRecords(current => appendPhotoRecord(current, record))}/>}</AppShell>; }
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Camera, CheckCircle2, ChevronRight, CloudOff, MapPin, SlidersHorizontal, Users } from 'lucide-react';
+import { AppShell } from '@/components/app-shell';
+import { BeforeAfter } from '@/components/before-after';
+import { CaptureSheet } from '@/components/capture-sheet';
+import { PhotoImage } from '@/components/photo-image';
+import { appendPhotoRecord, filterPhotoRecords, getPairedPhotos, loadLocalRecords, saveLocalRecords } from '@/lib/evidence';
+import { photos, projects, team } from '@/lib/mock-data';
+import type { PhotoRecord, Tag } from '@/types/domain';
+
+type ProjectTab = 'photos' | 'comparison' | 'team';
+const tags: Array<'All' | Tag> = ['All', 'Pre-Cover', 'Firestop Inspection', 'JCT Variation', 'Sub-base', 'Daily Progress'];
+const tabs: Array<{ id: ProjectTab; label: string }> = [{ id: 'photos', label: 'Photos' }, { id: 'comparison', label: 'Before & After' }, { id: 'team', label: 'Team' }];
+
+export default function ProjectPage() {
+  const params = useParams<{ id: string }>();
+  const projectId = params.id;
+  const project = projects.find(item => item.id === projectId);
+  const baseRecords = useMemo(() => photos.filter(item => item.projectId === projectId), [projectId]);
+  const [filter, setFilter] = useState<'All' | Tag>('All');
+  const [activeTab, setActiveTab] = useState<ProjectTab>('photos');
+  const [capture, setCapture] = useState(false);
+  const [records, setRecords] = useState<PhotoRecord[]>(baseRecords);
+
+  useEffect(() => {
+    if (!project) return;
+    const stored = loadLocalRecords(window.localStorage, projectId);
+    setRecords(stored.length ? stored : baseRecords);
+    setFilter('All');
+    setActiveTab('photos');
+  }, [baseRecords, project, projectId]);
+
+  if (!project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Project not found.</div></AppShell>;
+
+  const pair = getPairedPhotos(records, projectId);
+  const visibleRecords = filterPhotoRecords(records, filter);
+  const recordCount = project.photoCount + Math.max(0, records.length - baseRecords.length);
+
+  const handleSaved = (record: PhotoRecord) => {
+    const nextRecords = appendPhotoRecord(records, record);
+    setRecords(nextRecords);
+    saveLocalRecords(window.localStorage, projectId, nextRecords);
+  };
+
+  return <AppShell>
+    <div className="min-h-screen px-5 py-6 pb-28 lg:px-10 lg:py-9">
+      <div className="mx-auto max-w-7xl">
+        <Link href="/" className="inline-flex items-center gap-2 text-xs font-black text-navy/50 transition hover:text-blue"><ArrowLeft size={15} /> Back to projects</Link>
+
+        <div className="mt-6 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+          <div>
+            <div className="flex flex-wrap items-center gap-2"><span className="rounded-lg bg-blue/10 px-2.5 py-1.5 text-xs font-black text-blue">{project.code}</span><span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active project</span></div>
+            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-navy sm:text-4xl">{project.name}</h1>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-navy/50"><span className="flex items-center gap-1.5"><MapPin size={15} />{project.address}</span><span>Client: {project.clientName}</span><span>{recordCount} photo records</span></div>
+          </div>
+          <button type="button" onClick={() => setCapture(true)} className="flex items-center justify-center gap-2 rounded-xl bg-blue px-5 py-3 text-sm font-black text-white shadow-md shadow-blue/20 transition hover:bg-blue/90"><Camera size={18} /> Add photo</button>
+        </div>
+
+        <div className="mt-7 flex flex-col gap-5 rounded-2xl bg-navy p-5 text-white shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">Project progress</p><p className="mt-2 text-2xl font-black">{project.progress}% complete</p><p className="mt-1 text-xs text-white/50">Last activity {project.updatedAt}</p></div>
+          <div className="w-full max-w-xl"><div className="mb-2 flex justify-between text-[10px] font-black uppercase tracking-wider text-white/45"><span>Current stage</span><span>On track</span></div><div className="h-2.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-blue" style={{ width: project.progress + '%' }} /></div></div>
+        </div>
+
+        <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Project sections">
+          {tabs.map(tab => <button type="button" key={tab.id} role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={'whitespace-nowrap border-b-2 px-4 pb-3 text-sm font-black transition ' + (activeTab === tab.id ? 'border-blue text-blue' : 'border-transparent text-navy/45 hover:text-navy')}>{tab.label}</button>)}
+        </div>
+
+        {activeTab === 'photos' && <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]" role="tabpanel" aria-label="Project photos">
+          <div className="min-w-0">
+            {pair ? <section className="rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-5"><div className="mb-4 flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Progress snapshot</p><h2 className="mt-2 text-lg font-black text-navy">Before & After</h2><p className="mt-1 text-xs text-navy/50">{pair.before.location} · selected from this project</p></div><button type="button" onClick={() => setActiveTab('comparison')} className="flex items-center gap-1 text-xs font-black text-blue">Open full view <ChevronRight size={15} /></button></div><BeforeAfter before={pair.before.image} after={pair.after.image} /></section> : <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-navy/50">No before / after pair has been added to this project yet.</div>}
+
+            <section className="mt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project timeline</p><h2 className="mt-2 text-xl font-black text-navy">Photo records</h2><p className="mt-1 text-sm text-navy/50">Filter the evidence captured on this project.</p></div><div className="flex items-center gap-2 overflow-x-auto pb-1"><SlidersHorizontal size={16} className="shrink-0 text-navy/40" />{tags.map(tag => <button type="button" key={tag} onClick={() => setFilter(tag)} aria-pressed={filter === tag} className={'whitespace-nowrap rounded-full border px-3 py-2 text-[11px] font-black transition ' + (filter === tag ? 'border-blue bg-blue text-white' : 'border-line bg-white text-navy/55 hover:border-blue/30 hover:text-blue')}>{tag}</button>)}</div></div>
+              <div className="mt-5 space-y-4">{visibleRecords.map(record => <article key={record.id} className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"><div className="grid md:grid-cols-[240px_minmax(0,1fr)]"><div className="relative min-h-56 bg-navy/5"><PhotoImage src={record.image} alt="Site photo record" className="h-full w-full object-cover" sizes="(max-width: 768px) 100vw, 240px" /></div><div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-navy/40">{record.timestamp} · {record.location}</p><h3 className="mt-2 text-base font-black leading-6 text-navy">{record.note}</h3></div><CheckCircle2 size={19} className={'shrink-0 ' + (record.syncStatus === 'pending' ? 'text-amber-500' : 'text-emerald-600')} /></div><p className="mt-4 text-xs text-navy/50">Captured by <strong className="text-navy">{record.capturedBy}</strong>, {record.role}</p><div className="mt-4 flex flex-wrap gap-2">{record.tags.map(tag => <span key={tag} className="rounded-md bg-blue/8 px-2 py-1 text-[10px] font-black text-blue">{tag}</span>)}<span className="rounded-md bg-navy/5 px-2 py-1 text-[10px] font-bold text-navy/45">{record.syncStatus === 'synced' ? 'Sample record' : 'Saved locally · cloud sync not connected'}</span></div></div></div></article>)}</div>
+              {visibleRecords.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-line bg-white p-12 text-center text-sm text-navy/50">No records match this filter.</div>}
+            </section>
+          </div>
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project information</p><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-xs text-navy/40">Client</dt><dd className="mt-1 font-black text-navy">{project.clientName}</dd></div><div><dt className="text-xs text-navy/40">Site address</dt><dd className="mt-1 font-bold leading-5 text-navy">{project.address}</dd></div><div><dt className="text-xs text-navy/40">Records in this demo</dt><dd className="mt-1 font-black text-navy">{recordCount}</dd></div></dl></div>
+            <div className="rounded-2xl border border-blue/15 bg-blue/5 p-5"><div className="flex items-center gap-2 text-blue"><CloudOff size={17} /><p className="text-xs font-black">Local demo storage</p></div><p className="mt-2 text-xs leading-5 text-navy/55">New records are kept in this browser and remain after refresh. Cloud persistence and offline sync are Phase 2.</p></div>
+          </aside>
+        </div>}
+
+        {activeTab === 'comparison' && <section className="mt-6 max-w-5xl" role="tabpanel" aria-label="Before and after comparison">
+          {pair ? <div className="rounded-2xl border border-line bg-white p-4 shadow-sm sm:p-6"><div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project comparison</p><h2 className="mt-2 text-2xl font-black text-navy">Track the change at a glance</h2><p className="mt-1 text-sm text-navy/50">{pair.before.location} · keyboard accessible divider</p></div><BeforeAfter before={pair.before.image} after={pair.after.image} /><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-canvas p-4"><p className="text-[10px] font-black uppercase tracking-wider text-navy/40">Before</p><p className="mt-2 text-sm font-bold text-navy">{pair.before.note}</p><p className="mt-2 text-xs text-navy/45">{pair.before.timestamp} · {pair.before.capturedBy}</p></div><div className="rounded-xl bg-blue/5 p-4"><p className="text-[10px] font-black uppercase tracking-wider text-blue">After</p><p className="mt-2 text-sm font-bold text-navy">{pair.after.note}</p><p className="mt-2 text-xs text-navy/45">{pair.after.timestamp} · {pair.after.capturedBy}</p></div></div></div> : <div className="rounded-2xl border border-dashed border-line bg-white p-12 text-center text-sm text-navy/50">No before / after pair has been added to this project yet.</div>}
+        </section>}
+
+        {activeTab === 'team' && <section className="mt-6 max-w-3xl" role="tabpanel" aria-label="Project team"><div className="rounded-2xl border border-line bg-white p-5 shadow-sm sm:p-6"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project team</p><h2 className="mt-2 text-2xl font-black text-navy">People capturing the detail</h2><p className="mt-1 text-sm text-navy/50">Sample roles for this client demonstration.</p></div><div className="mt-6 divide-y divide-line">{team.map(member => <div key={member.id} className="flex items-center gap-3 py-4 first:pt-0 last:pb-0"><span className="grid h-10 w-10 place-items-center rounded-full bg-blue/10 text-xs font-black text-blue">{member.initials}</span><div className="flex-1"><p className="text-sm font-black text-navy">{member.name}</p><p className="mt-0.5 text-xs text-navy/45">{member.role}</p></div><span className="flex items-center gap-2 text-xs font-bold text-navy/50"><span className={'h-2 w-2 rounded-full ' + (member.status === 'On site' ? 'bg-emerald-500' : 'bg-navy/20')} />{member.status}</span></div>)}</div><div className="mt-6 flex items-start gap-3 rounded-xl bg-canvas p-4 text-xs leading-5 text-navy/55"><Users size={16} className="mt-0.5 shrink-0 text-blue" />Team accounts and permissions are intentionally outside this lightweight prototype.</div></div></section>}
+      </div>
+    </div>
+    {capture && <CaptureSheet projectId={project.id} onClose={() => setCapture(false)} onSaved={handleSaved} />}
+  </AppShell>;
+}

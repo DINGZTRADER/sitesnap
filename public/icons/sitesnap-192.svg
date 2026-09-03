@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title">
+  <title>SiteSnap app icon</title>
+  <rect width="192" height="192" rx="42" fill="#0b1f33"/>
+  <path fill="#2f7df4" d="M44 68 96 35l52 33v60l-52 29-52-29V68Z"/>
+  <path fill="#d8f5e8" d="m64 79 32-20 32 20v41l-32 18-32-18V79Zm14 9v24l18 10 18-10V88L96 77 78 88Z"/>
+  <circle cx="96" cy="99" r="9" fill="#b8f36b"/>
+</svg>

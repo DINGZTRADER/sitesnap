@@ -5,4 +5,5 @@ declare module 'next/link' {
 }
 declare module 'next/navigation' {
   export function useParams<T extends Record<string, string> = Record<string, string>>(): T;
+  export function usePathname(): string;
 }

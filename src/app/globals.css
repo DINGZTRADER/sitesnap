@@ -1,2 +1,46 @@
-@tailwind base; @tailwind components; @tailwind utilities;
-:root{background:#f6f8f5;color:#10251f}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif}button{font:inherit}.grain{background-image:radial-gradient(#10251f12 .7px,transparent .7px);background-size:8px 8px}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background: #f5f7fb;
+  color: #0b1f33;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+a,
+input,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #2f7df4;
+  outline-offset: 3px;
+}
+
+.grain {
+  background-image: radial-gradient(#0b1f3314 0.7px, transparent 0.7px);
+  background-size: 9px 9px;
+}
+
+.surface-shadow {
+  box-shadow: 0 18px 50px rgba(11, 31, 51, 0.08);
+}
