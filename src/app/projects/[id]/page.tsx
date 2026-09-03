@@ -57,7 +57,7 @@ export default function ProjectPage() {
             <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-navy sm:text-4xl">{project.name}</h1>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-navy/50"><span className="flex items-center gap-1.5"><MapPin size={15} />{project.address}</span><span>Client: {project.clientName}</span><span>{recordCount} photo records</span></div>
           </div>
-          <button type="button" onClick={() => setCapture(true)} className="flex items-center justify-center gap-2 rounded-xl bg-blue px-5 py-3 text-sm font-black text-white shadow-md shadow-blue/20 transition hover:bg-blue/90"><Camera size={18} /> Add photo</button>
+          <button type="button" onClick={() => setCapture(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue px-5 py-3 text-sm font-black text-white shadow-md shadow-blue/20 transition hover:bg-blue/90 xl:w-auto"><Camera size={18} /> Add photo</button>
         </div>
 
         <div className="mt-7 flex flex-col gap-5 rounded-2xl bg-navy p-5 text-white shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
@@ -65,7 +65,7 @@ export default function ProjectPage() {
           <div className="w-full max-w-xl"><div className="mb-2 flex justify-between text-[10px] font-black uppercase tracking-wider text-white/45"><span>Current stage</span><span>On track</span></div><div className="h-2.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-blue" style={{ width: project.progress + '%' }} /></div></div>
         </div>
 
-        <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Project sections">
+        <div className="-mx-5 mt-7 flex gap-1 overflow-x-auto border-b border-line px-5 sm:mx-0 sm:px-0" role="tablist" aria-label="Project sections">
           {tabs.map(tab => <button type="button" key={tab.id} role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={'whitespace-nowrap border-b-2 px-4 pb-3 text-sm font-black transition ' + (activeTab === tab.id ? 'border-blue text-blue' : 'border-transparent text-navy/45 hover:text-navy')}>{tab.label}</button>)}
         </div>
 

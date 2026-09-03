@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main>{children}</main>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-around border-t border-line bg-white/95 p-2.5 backdrop-blur lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-around border-t border-line bg-white/95 px-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur lg:hidden">
         {navItems.map(item => {
           const Icon = item.icon;
           return <Link key={item.label} href={item.href} className={'grid min-w-16 place-items-center rounded-xl px-3 py-2 text-[10px] font-black ' + (item.active ? 'bg-blue/10 text-blue' : 'text-navy/45')}><Icon size={19} /><span className="mt-1">{item.label}</span></Link>;

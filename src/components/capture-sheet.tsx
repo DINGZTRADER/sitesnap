@@ -92,8 +92,8 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
       role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
-      <section className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-labelledby="capture-title">
-        <div className="flex items-start justify-between border-b border-line px-5 py-5 sm:px-7">
+      <section className="flex max-h-[94dvh] w-full max-w-xl flex-col rounded-t-3xl bg-white shadow-2xl sm:max-h-[94vh] sm:rounded-3xl" role="dialog" aria-modal="true" aria-labelledby="capture-title">
+        <div className="flex shrink-0 items-start justify-between border-b border-line px-5 py-5 sm:px-7">
           <div>
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-blue"><Camera size={14} /> New site record</p>
             <h2 id="capture-title" className="mt-2 text-2xl font-black tracking-tight text-navy">Add a site photo</h2>
@@ -104,7 +104,7 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
           </button>
         </div>
 
-        <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
           <label htmlFor="capture-photo" className="group relative flex min-h-48 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-blue/25 bg-blue/5 px-4 py-7 text-center transition hover:border-blue hover:bg-blue/10">
             {preview ? (
               <>
@@ -143,6 +143,9 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
             <p><strong className="text-navy">Demo workspace.</strong> This record saves to this browser only. Cloud sync is not connected yet.</p>
           </div>
 
+        </div>
+
+        <div className="shrink-0 border-t border-line bg-white px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7">
           <button type="button" disabled={!canSaveCapture(file) || saving} onClick={save} aria-busy={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue/20 transition hover:bg-blue/90 disabled:cursor-not-allowed disabled:bg-navy/15 disabled:text-navy/40 disabled:shadow-none">
             {saving ? <><LoaderCircle size={17} className="animate-spin" /> Saving locally…</> : <><Check size={17} /> Save to project timeline</>}
           </button>
