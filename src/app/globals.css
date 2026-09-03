@@ -1,0 +1,2 @@
+@tailwind base; @tailwind components; @tailwind utilities;
+:root{background:#f6f8f5;color:#10251f}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif}button{font:inherit}.grain{background-image:radial-gradient(#10251f12 .7px,transparent .7px);background-size:8px 8px}
