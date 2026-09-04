@@ -9,7 +9,8 @@ import { BeforeAfter } from '@/components/before-after';
 import { CaptureSheet } from '@/components/capture-sheet';
 import { PhotoImage } from '@/components/photo-image';
 import { appendPhotoRecord, filterPhotoRecords, getPairedPhotos, loadLocalRecords, saveLocalRecords } from '@/lib/evidence';
-import { photos, projects, team } from '@/lib/mock-data';
+import { photos, team } from '@/lib/mock-data';
+import { useWorkspace } from '@/components/workspace-provider';
 import type { PhotoRecord, Tag } from '@/types/domain';
 
 type ProjectTab = 'photos' | 'comparison' | 'team';
@@ -19,7 +20,8 @@ const tabs: Array<{ id: ProjectTab; label: string }> = [{ id: 'photos', label: '
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
-  const project = projects.find(item => item.id === projectId);
+  const { projects: workspaceProjects, loading: workspaceLoading } = useWorkspace();
+  const project = workspaceProjects.find(item => item.id === projectId);
   const baseRecords = useMemo(() => photos.filter(item => item.projectId === projectId), [projectId]);
   const [filter, setFilter] = useState<'All' | Tag>('All');
   const [activeTab, setActiveTab] = useState<ProjectTab>('photos');
@@ -34,6 +36,7 @@ export default function ProjectPage() {
     setActiveTab('photos');
   }, [baseRecords, project, projectId]);
 
+  if (workspaceLoading && !project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Loading project…</div></AppShell>;
   if (!project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Project not found.</div></AppShell>;
 
   const pair = getPairedPhotos(records, projectId);
