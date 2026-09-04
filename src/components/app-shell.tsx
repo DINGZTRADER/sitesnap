@@ -9,6 +9,7 @@ import { PricingPanel } from '@/components/pricing-panel';
 import { PhotoImage } from '@/components/photo-image';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getRuntimeMode } from '@/lib/runtime-mode';
+import { getWorkspaceStatus } from '@/lib/project-view-model';
 import { useWorkspace } from '@/components/workspace-provider';
 import type { Project } from '@/types/domain';
 
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   const isCloud = runtimeMode === 'cloud';
   const [cloudUser, setCloudUser] = useState<{ email?: string | null } | null>(null);
+  const workspaceStatus = getWorkspaceStatus(runtimeMode, Boolean(cloudUser));
   const currentProjectId = pathname.startsWith('/projects/') ? pathname.split('/')[2] : demoProjects[0].id;
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black text-white/80">{isCloud ? (cloudUser ? 'Cloud pilot · synced' : 'Sign in to sync across devices') : 'Demo workspace'}</p>
+            <p className="text-xs font-black text-white/80">{workspaceStatus}</p>
             {isCloud ? <span className="h-2 w-2 rounded-full bg-lime" /> : <CloudOff size={15} className="text-lime" />}
           </div>
           <p className="mt-2 text-xs leading-5 text-white/50">{isCloud ? 'Sites and records use the hosted pilot workspace.' : 'Local records only. Cloud sync is not connected.'}</p>
@@ -150,21 +152,23 @@ export function Dashboard() {
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   }) === 'cloud';
   const activeProjects = workspaceProjects.filter(project => project.status === 'active');
+  const showWorkspaceLoading = loading && activeProjects.length === 0;
   const firstProjectId = activeProjects[0]?.id ?? (isCloud ? null : demoProjects[0].id);
+  const workspaceStatus = isCloud ? 'Cloud pilot · synced' : 'Demo workspace · local only';
   return <AppShell>
     <div className="grain min-h-[calc(100vh-76px)] px-5 py-6 pb-28 lg:px-10 lg:py-9">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-          <div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-black uppercase tracking-[0.16em] text-blue">Thursday · 3 September 2026</span><span className="rounded-full bg-blue/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue">Local demo</span></div><h1 className="mt-3 text-3xl font-black tracking-tight text-navy sm:text-4xl">Good morning, Liam.</h1><p className="mt-2 max-w-xl text-sm leading-6 text-navy/55">Keep every site detail in one clear record, ready when your client or clerk of works needs it.</p></div>
+          <div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-black uppercase tracking-[0.16em] text-blue">Thursday · 3 September 2026</span><span className="rounded-full bg-blue/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue">{isCloud ? 'Cloud pilot' : 'Local demo'}</span></div><h1 className="mt-3 text-3xl font-black tracking-tight text-navy sm:text-4xl">Good morning, Liam.</h1><p className="mt-2 max-w-xl text-sm leading-6 text-navy/55">Keep every site detail in one clear record, ready when your client or clerk of works needs it.</p></div>
           <div className="flex gap-2"><button type="button" onClick={() => setPricing(true)} className="rounded-xl border border-line bg-white px-4 py-3 text-xs font-black text-navy shadow-sm transition hover:border-blue/30 hover:text-blue">View pricing</button><Link href={firstProjectId ? '/projects/' + firstProjectId : '/projects'} className="flex items-center justify-center gap-2 rounded-xl bg-blue px-4 py-3 text-xs font-black text-white shadow-md shadow-blue/20 transition hover:bg-blue/90"><Camera size={16} /> Add a site photo</Link></div>
         </div>
 
         <div className="mt-7 flex flex-col gap-4 rounded-2xl border border-blue/15 bg-gradient-to-r from-blue/10 via-white to-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-blue shadow-sm"><CloudOff size={19} /></span><div><p className="text-sm font-black text-navy">Demo workspace · local only</p><p className="mt-1 text-xs leading-5 text-navy/55">Photos and notes are saved in this browser for the demonstration. Cloud sync is not connected.</p></div></div>
-          <span className="self-start rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-blue shadow-sm sm:self-center">Prototype mode</span>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-blue shadow-sm"><CloudOff size={19} /></span><div><p className="text-sm font-black text-navy">{workspaceStatus}</p><p className="mt-1 text-xs leading-5 text-navy/55">{isCloud ? 'Sites and records use the hosted pilot workspace for this signed-in account.' : 'Photos and notes are saved in this browser for the demonstration. Cloud sync is not connected.'}</p></div></div>
+          <span className="self-start rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-blue shadow-sm sm:self-center">{isCloud ? 'Pilot mode' : 'Prototype mode'}</span>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3"><Stat label="Active projects" value={loading ? '…' : String(activeProjects.length)} detail={isCloud ? 'In your shared workspace' : 'All sites reporting'} /><Stat label="Photo records" value={isCloud ? '—' : '101'} detail={isCloud ? 'Records appear after capture' : 'Across your active sites'} /><Stat label="Team on site" value={isCloud ? '—' : '3 / 4'} detail={isCloud ? 'Pilot team data' : 'One member away today'} /></div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3"><Stat label="Active projects" value={showWorkspaceLoading ? '…' : String(activeProjects.length)} detail={isCloud ? 'In your shared workspace' : 'All sites reporting'} /><Stat label="Photo records" value={isCloud ? '—' : '101'} detail={isCloud ? 'Records appear after capture' : 'Across your active sites'} /><Stat label="Team on site" value={isCloud ? '—' : '3 / 4'} detail={isCloud ? 'Pilot team data' : 'One member away today'} /></div>
 
         <section className="mt-8 rounded-2xl border border-line bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Get started</p><h2 className="mt-2 text-xl font-black text-navy">Build your first clear record</h2><p className="mt-1 text-sm text-navy/50">A simple routine for every visit to site.</p></div><div className="text-left sm:text-right"><p className="text-xs font-black text-navy">2 of 3 steps</p><div className="mt-2 h-2 w-36 rounded-full bg-navy/8"><div className="h-full w-2/3 rounded-full bg-blue" /></div></div></div>
@@ -172,11 +176,11 @@ export function Dashboard() {
         </section>
 
         <section id="projects" className="mt-9">
-          <div className="mb-4 flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Your work</p><h2 className="mt-2 text-xl font-black text-navy">Active projects</h2><p className="mt-1 text-sm text-navy/50">Select a project to view its photo timeline.</p></div><span className="text-xs font-black text-navy/40">{loading ? 'Loading…' : activeProjects.length + ' active'}</span></div>
+          <div className="mb-4 flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Your work</p><h2 className="mt-2 text-xl font-black text-navy">Active projects</h2><p className="mt-1 text-sm text-navy/50">Select a project to view its photo timeline.</p></div><span className="text-xs font-black text-navy/40">{showWorkspaceLoading ? 'Loading…' : activeProjects.length + ' active'}</span></div>
           {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-800">{error}</div>}
-          {!error && loading && <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-sm text-navy/50">Loading your workspace…</div>}
-          {!error && !loading && activeProjects.length === 0 && <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-sm text-navy/55">No sites yet. Create your first site to start a shared record.</div>}
-          {!error && !loading && activeProjects.length > 0 && <div className="grid gap-4 md:grid-cols-3">{activeProjects.map(project => <SiteCard key={project.id} p={project} />)}</div>}
+          {!error && showWorkspaceLoading && <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-sm text-navy/50">Loading your workspace…</div>}
+          {!error && !showWorkspaceLoading && activeProjects.length === 0 && <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-sm text-navy/55">No sites yet. Create your first site to start a shared record.</div>}
+          {!error && !showWorkspaceLoading && activeProjects.length > 0 && <div className="grid gap-4 md:grid-cols-3">{activeProjects.map(project => <SiteCard key={project.id} p={project} />)}</div>}
         </section>
 
         <section className="mt-9 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">

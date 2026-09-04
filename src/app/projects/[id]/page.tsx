@@ -8,10 +8,11 @@ import { AppShell } from '@/components/app-shell';
 import { BeforeAfter } from '@/components/before-after';
 import { CaptureSheet } from '@/components/capture-sheet';
 import { PhotoImage } from '@/components/photo-image';
-import { filterPhotoRecords, getPairedPhotos } from '@/lib/evidence';
+import { filterPhotoRecords } from '@/lib/evidence';
 import { team } from '@/lib/mock-data';
 import { useWorkspace } from '@/components/workspace-provider';
 import { getRuntimeMode } from '@/lib/runtime-mode';
+import { getProjectPair } from '@/lib/project-view-model';
 import type { PhotoRecord, Tag } from '@/types/domain';
 
 type ProjectTab = 'photos' | 'comparison' | 'team';
@@ -54,7 +55,7 @@ export default function ProjectPage() {
   if (workspaceLoading && !project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Loading project…</div></AppShell>;
   if (!project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Project not found.</div></AppShell>;
 
-  const pair = getPairedPhotos(records, projectId);
+  const pair = getProjectPair(records, projectId);
   const visibleRecords = filterPhotoRecords(records, filter);
   const recordCount = recordsLoading ? project.photoCount : records.length;
 

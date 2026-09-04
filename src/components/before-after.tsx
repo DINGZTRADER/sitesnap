@@ -34,6 +34,7 @@ export function BeforeAfter({ before, after }: { before: string; after: string }
       className="relative aspect-[16/9] overflow-hidden rounded-2xl bg-navy outline-none focus-visible:ring-4 focus-visible:ring-blue/25"
       role="slider"
       tabIndex={0}
+      aria-orientation="horizontal"
       aria-label="Before and after comparison. Use arrow keys to move the divider."
       aria-valuemin={0}
       aria-valuemax={100}

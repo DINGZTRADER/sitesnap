@@ -69,25 +69,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [repositoryContext, setRepositoryContext] = useState<RepositoryContext | null>(null);
   const [projects, setProjects] = useState<Project[]>(mode === 'demo' ? demoProjects : []);
-  const [loading, setLoading] = useState(mode === 'cloud');
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refreshProjects = useCallback(async () => {
     setError(null);
+    setLoading(true);
 
     if (mode === 'demo') {
       const context = repositoryContext ?? { mode: 'demo', workspaceId: null, userId: null, supabase: null } satisfies RepositoryContext;
       setRepositoryContext(context);
-      setLoading(false);
       try {
         setProjects(await listProjects(context));
       } catch {
         setError('We could not load the local demo workspace.');
+      } finally {
+        setLoading(false);
       }
       return;
     }
 
-    setLoading(true);
     try {
       const context = repositoryContext ?? await createRepositoryContext();
       const nextProjects = await listProjects(context);
