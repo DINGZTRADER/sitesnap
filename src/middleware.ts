@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRuntimeMode } from '@/lib/runtime-mode';
+import { requiresAuthentication } from '@/lib/public-routes';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/database';
 
@@ -32,7 +33,7 @@ export async function middleware(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
 
-  if (!data.user && !pathname.startsWith('/login') && !pathname.startsWith('/auth')) {
+  if (!data.user && requiresAuthentication(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '';
