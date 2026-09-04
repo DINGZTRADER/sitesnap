@@ -3,10 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { createProject as createProjectRecord, listProjects } from '@/lib/projects-repository';
+import { createPhotoRecord as createPhotoRecordRecord, listPhotoRecords as listPhotoRecordsRecord } from '@/lib/photo-repository';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getRuntimeMode } from '@/lib/runtime-mode';
 import type { RepositoryContext } from '@/lib/repository-context';
-import type { Project } from '@/types/domain';
+import type { PhotoRecord, Project, Tag } from '@/types/domain';
 import { projects as demoProjects } from '@/lib/mock-data';
 
 type WorkspaceValue = {
@@ -15,6 +16,8 @@ type WorkspaceValue = {
   error: string | null;
   refreshProjects: () => Promise<void>;
   createProject: (input: { name: string; address: string; clientName: string; code: string }) => Promise<Project>;
+  loadPhotoRecords: (projectId: string) => Promise<PhotoRecord[]>;
+  createPhotoRecord: (input: { projectId: string; file: File; note: string; tags: Tag[] }) => Promise<PhotoRecord>;
 };
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
@@ -97,6 +100,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [repositoryContext]);
 
+  const getRepositoryContext = useCallback(async (): Promise<RepositoryContext> => {
+    if (repositoryContext) return repositoryContext;
+    const context = await createRepositoryContext();
+    setRepositoryContext(context);
+    return context;
+  }, [repositoryContext]);
+
   useEffect(() => {
     if (pathname === '/login' || pathname.startsWith('/auth')) {
       setLoading(false);
@@ -106,14 +116,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [pathname, refreshProjects]);
 
   const createProject = useCallback(async (input: { name: string; address: string; clientName: string; code: string }) => {
-    const context = repositoryContext ?? await createRepositoryContext();
+    const context = await getRepositoryContext();
     const project = await createProjectRecord(input, context);
     setRepositoryContext(context);
     setProjects(current => [project, ...current.filter(item => item.id !== project.id)]);
     return project;
-  }, [repositoryContext]);
+  }, [getRepositoryContext]);
 
-  const value = useMemo(() => ({ projects, loading, error, refreshProjects, createProject }), [createProject, error, loading, projects, refreshProjects]);
+  const loadPhotoRecords = useCallback(async (projectId: string) => {
+    return listPhotoRecordsRecord(await getRepositoryContext(), projectId);
+  }, [getRepositoryContext]);
+
+  const createPhotoRecord = useCallback(async (input: { projectId: string; file: File; note: string; tags: Tag[] }) => {
+    const record = await createPhotoRecordRecord(await getRepositoryContext(), input);
+    setProjects(current => current.map(project => project.id === input.projectId
+      ? { ...project, photoCount: project.photoCount + 1, updatedAt: 'Just now' }
+      : project));
+    return record;
+  }, [getRepositoryContext]);
+
+  const value = useMemo(() => ({ projects, loading, error, refreshProjects, createProject, loadPhotoRecords, createPhotoRecord }), [createPhotoRecord, createProject, error, loadPhotoRecords, loading, projects, refreshProjects]);
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 

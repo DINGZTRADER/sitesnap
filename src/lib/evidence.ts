@@ -2,6 +2,8 @@ import type { PhotoRecord, Tag } from '../types/domain';
 
 type LocalRecordStorage = Pick<Storage, 'getItem' | 'setItem'>;
 const localRecordKey = (projectId: string) => 'sitesnap:records:' + projectId;
+const captureImageTypes = new Set(['image/jpeg', 'image/png', 'image/heic']);
+const maxCaptureBytes = 10 * 1024 * 1024;
 
 export function getPairedPhotos(records: PhotoRecord[], projectId: string): { before: PhotoRecord; after: PhotoRecord } | null {
   const projectRecords = records.filter(record => record.projectId === projectId);
@@ -15,7 +17,7 @@ export function appendPhotoRecord(records: PhotoRecord[], record: PhotoRecord): 
 }
 
 export function canSaveCapture(file: File | null): boolean {
-  return file !== null && file.type.startsWith('image/');
+  return file !== null && captureImageTypes.has(file.type.toLowerCase()) && (file.size ?? 0) <= maxCaptureBytes;
 }
 
 export function filterPhotoRecords(records: PhotoRecord[], tag: Tag | 'All'): PhotoRecord[] {

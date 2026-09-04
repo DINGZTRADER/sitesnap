@@ -2,21 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, ImagePlus, LoaderCircle, X } from 'lucide-react';
-import { canSaveCapture } from '@/lib/evidence';
-import type { PhotoRecord, Tag } from '@/types/domain';
+import { validateImageFile } from '@/lib/image-upload';
+import type { Tag } from '@/types/domain';
 
 const availableTags: Tag[] = ['Daily Progress', 'Pre-Cover', 'Firestop Inspection', 'JCT Variation', 'Snagging Defect'];
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Image could not be read.'));
-    reader.onerror = () => reject(reader.error ?? new Error('Image could not be read.'));
-    reader.readAsDataURL(file);
-  });
-}
+type CaptureInput = { file: File; note: string; tags: Tag[] };
 
-export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: string; onClose: () => void; onSaved: (record: PhotoRecord) => void | Promise<void> }) {
+export function CaptureSheet({ onClose, onSave, cloudMode = false }: { projectId: string; onClose: () => void; onSave: (input: CaptureInput) => void | Promise<void>; cloudMode?: boolean }) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -52,9 +45,10 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
       setFile(null);
       return;
     }
-    if (!canSaveCapture(selectedFile)) {
+    const validation = validateImageFile(selectedFile);
+    if (!validation.ok) {
       setFile(null);
-      setError('Please choose an image file such as JPG, PNG, or HEIC.');
+      setError(validation.message);
       return;
     }
     setError('');
@@ -62,29 +56,23 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
   };
 
   const save = async () => {
-    if (!canSaveCapture(file) || !file) return;
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      setError(validation.message);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      const image = await readFileAsDataUrl(file);
-      await onSaved({
-        id: 'local-' + Date.now(),
-        projectId,
-        image,
-        timestamp: 'Just now',
-        capturedBy: 'Liam Cooper',
-        role: 'Site Manager',
-        location: 'New local record',
-        tags,
-        note: note.trim() || 'Photo added from the field.',
-        syncStatus: 'pending',
-      });
+      await onSave({ file: validation.file, note, tags });
       onClose();
     } catch {
-      setError('This image could not be saved locally. Please try another photo.');
+      setError(cloudMode ? 'This image could not be synced. Check your connection and try again.' : 'This image could not be saved locally. Please try another photo.');
       setSaving(false);
     }
   };
+
+  const canSave = validateImageFile(file).ok;
 
   return (
     <div
@@ -140,14 +128,14 @@ export function CaptureSheet({ projectId, onClose, onSaved }: { projectId: strin
 
           <div className="flex items-start gap-3 rounded-2xl bg-[#eef7ff] p-4 text-sm text-navy/65">
             <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-blue"><Check size={15} /></span>
-            <p><strong className="text-navy">Demo workspace.</strong> This record saves to this browser only. Cloud sync is not connected yet.</p>
+            <p>{cloudMode ? <><strong className="text-navy">Cloud pilot.</strong> This record uploads to the shared workspace for the signed-in account.</> : <><strong className="text-navy">Demo workspace.</strong> This record saves to this browser only. Cloud sync is not connected yet.</>}</p>
           </div>
 
         </div>
 
         <div className="shrink-0 border-t border-line bg-white px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7">
-          <button type="button" disabled={!canSaveCapture(file) || saving} onClick={save} aria-busy={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue/20 transition hover:bg-blue/90 disabled:cursor-not-allowed disabled:bg-navy/15 disabled:text-navy/40 disabled:shadow-none">
-            {saving ? <><LoaderCircle size={17} className="animate-spin" /> Saving locally…</> : <><Check size={17} /> Save to project timeline</>}
+          <button type="button" disabled={!canSave || saving} onClick={save} aria-busy={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue/20 transition hover:bg-blue/90 disabled:cursor-not-allowed disabled:bg-navy/15 disabled:text-navy/40 disabled:shadow-none">
+            {saving ? <><LoaderCircle size={17} className="animate-spin" /> {cloudMode ? 'Saving to workspace…' : 'Saving locally…'}</> : <><Check size={17} /> Save to project timeline</>}
           </button>
         </div>
       </section>

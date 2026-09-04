@@ -10,7 +10,7 @@ type PhotoImageProps = {
 };
 
 export function PhotoImage({ src, alt, className, sizes = '(max-width: 768px) 100vw, 50vw', priority = false, fill = false }: PhotoImageProps) {
-  if (src.startsWith('data:') || src.startsWith('blob:')) {
+  if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('http://') || src.startsWith('https://')) {
     return <img src={src} alt={alt} className={className} />;
   }
 

@@ -2,51 +2,65 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Camera, CheckCircle2, ChevronRight, CloudOff, MapPin, SlidersHorizontal, Users } from 'lucide-react';
 import { AppShell } from '@/components/app-shell';
 import { BeforeAfter } from '@/components/before-after';
 import { CaptureSheet } from '@/components/capture-sheet';
 import { PhotoImage } from '@/components/photo-image';
-import { appendPhotoRecord, filterPhotoRecords, getPairedPhotos, loadLocalRecords, saveLocalRecords } from '@/lib/evidence';
-import { photos, team } from '@/lib/mock-data';
+import { filterPhotoRecords, getPairedPhotos } from '@/lib/evidence';
+import { team } from '@/lib/mock-data';
 import { useWorkspace } from '@/components/workspace-provider';
+import { getRuntimeMode } from '@/lib/runtime-mode';
 import type { PhotoRecord, Tag } from '@/types/domain';
 
 type ProjectTab = 'photos' | 'comparison' | 'team';
 const tags: Array<'All' | Tag> = ['All', 'Pre-Cover', 'Firestop Inspection', 'JCT Variation', 'Sub-base', 'Daily Progress'];
 const tabs: Array<{ id: ProjectTab; label: string }> = [{ id: 'photos', label: 'Photos' }, { id: 'comparison', label: 'Before & After' }, { id: 'team', label: 'Team' }];
+const appMode = getRuntimeMode({
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+});
 
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
-  const { projects: workspaceProjects, loading: workspaceLoading } = useWorkspace();
+  const { projects: workspaceProjects, loading: workspaceLoading, loadPhotoRecords, createPhotoRecord } = useWorkspace();
   const project = workspaceProjects.find(item => item.id === projectId);
-  const baseRecords = useMemo(() => photos.filter(item => item.projectId === projectId), [projectId]);
   const [filter, setFilter] = useState<'All' | Tag>('All');
   const [activeTab, setActiveTab] = useState<ProjectTab>('photos');
   const [capture, setCapture] = useState(false);
-  const [records, setRecords] = useState<PhotoRecord[]>(baseRecords);
+  const [records, setRecords] = useState<PhotoRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project) return;
-    const stored = loadLocalRecords(window.localStorage, projectId);
-    setRecords(stored.length ? stored : baseRecords);
+    let current = true;
+    setRecordsLoading(true);
+    setRecordsError(null);
+    void loadPhotoRecords(projectId)
+      .then(nextRecords => { if (current) setRecords(nextRecords); })
+      .catch(() => { if (current) setRecordsError(appMode === 'cloud' ? 'We could not load the shared photo records.' : 'We could not load the local demo records.'); })
+      .finally(() => { if (current) setRecordsLoading(false); });
+    return () => { current = false; };
+  }, [loadPhotoRecords, project, projectId]);
+
+  useEffect(() => {
     setFilter('All');
     setActiveTab('photos');
-  }, [baseRecords, project, projectId]);
+  }, [projectId]);
 
   if (workspaceLoading && !project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Loading project…</div></AppShell>;
   if (!project) return <AppShell><div className="px-5 py-10 text-sm text-navy/55">Project not found.</div></AppShell>;
 
   const pair = getPairedPhotos(records, projectId);
   const visibleRecords = filterPhotoRecords(records, filter);
-  const recordCount = project.photoCount + Math.max(0, records.length - baseRecords.length);
+  const recordCount = recordsLoading ? project.photoCount : records.length;
 
-  const handleSaved = (record: PhotoRecord) => {
-    const nextRecords = appendPhotoRecord(records, record);
-    setRecords(nextRecords);
-    saveLocalRecords(window.localStorage, projectId, nextRecords);
+  const handleSaved = async (input: { file: File; note: string; tags: Tag[] }) => {
+    const record = await createPhotoRecord({ projectId, ...input });
+    setRecords(current => [record, ...current.filter(item => item.id !== record.id)]);
   };
 
   return <AppShell>
@@ -78,13 +92,15 @@ export default function ProjectPage() {
 
             <section className="mt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project timeline</p><h2 className="mt-2 text-xl font-black text-navy">Photo records</h2><p className="mt-1 text-sm text-navy/50">Filter the evidence captured on this project.</p></div><div className="flex items-center gap-2 overflow-x-auto pb-1"><SlidersHorizontal size={16} className="shrink-0 text-navy/40" />{tags.map(tag => <button type="button" key={tag} onClick={() => setFilter(tag)} aria-pressed={filter === tag} className={'whitespace-nowrap rounded-full border px-3 py-2 text-[11px] font-black transition ' + (filter === tag ? 'border-blue bg-blue text-white' : 'border-line bg-white text-navy/55 hover:border-blue/30 hover:text-blue')}>{tag}</button>)}</div></div>
-              <div className="mt-5 space-y-4">{visibleRecords.map(record => <article key={record.id} className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"><div className="grid md:grid-cols-[240px_minmax(0,1fr)]"><div className="relative min-h-56 bg-navy/5"><PhotoImage src={record.image} alt="Site photo record" className="h-full w-full object-cover" sizes="(max-width: 768px) 100vw, 240px" /></div><div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-navy/40">{record.timestamp} · {record.location}</p><h3 className="mt-2 text-base font-black leading-6 text-navy">{record.note}</h3></div><CheckCircle2 size={19} className={'shrink-0 ' + (record.syncStatus === 'pending' ? 'text-amber-500' : 'text-emerald-600')} /></div><p className="mt-4 text-xs text-navy/50">Captured by <strong className="text-navy">{record.capturedBy}</strong>, {record.role}</p><div className="mt-4 flex flex-wrap gap-2">{record.tags.map(tag => <span key={tag} className="rounded-md bg-blue/8 px-2 py-1 text-[10px] font-black text-blue">{tag}</span>)}<span className="rounded-md bg-navy/5 px-2 py-1 text-[10px] font-bold text-navy/45">{record.syncStatus === 'synced' ? 'Sample record' : 'Saved locally · cloud sync not connected'}</span></div></div></div></article>)}</div>
-              {visibleRecords.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-line bg-white p-12 text-center text-sm text-navy/50">No records match this filter.</div>}
+              {recordsError && <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-800">{recordsError}<button type="button" onClick={() => { setRecordsError(null); setRecordsLoading(true); void loadPhotoRecords(projectId).then(setRecords).catch(() => setRecordsError('We could not load the photo records.')).finally(() => setRecordsLoading(false)); }} className="ml-3 underline">Try again</button></div>}
+              {recordsLoading && <div className="mt-5 rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-navy/50">{appMode === 'cloud' ? 'Syncing records…' : 'Loading local records…'}</div>}
+              {!recordsLoading && !recordsError && <div className="mt-5 space-y-4">{visibleRecords.map(record => <article key={record.id} className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"><div className="grid md:grid-cols-[240px_minmax(0,1fr)]"><div className="relative min-h-56 bg-navy/5"><PhotoImage src={record.image} alt="Site photo record" className="h-full w-full object-cover" sizes="(max-width: 768px) 100vw, 240px" /></div><div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-navy/40">{record.timestamp} · {record.location}</p><h3 className="mt-2 text-base font-black leading-6 text-navy">{record.note}</h3></div><CheckCircle2 size={19} className={'shrink-0 ' + (record.syncStatus === 'pending' ? 'text-amber-500' : 'text-emerald-600')} /></div><p className="mt-4 text-xs text-navy/50">Captured by <strong className="text-navy">{record.capturedBy}</strong>, {record.role}</p><div className="mt-4 flex flex-wrap gap-2">{record.tags.map(tag => <span key={tag} className="rounded-md bg-blue/8 px-2 py-1 text-[10px] font-black text-blue">{tag}</span>)}<span className="rounded-md bg-navy/5 px-2 py-1 text-[10px] font-bold text-navy/45">{record.syncStatus === 'synced' ? 'Synced record' : 'Saved locally · cloud sync not connected'}</span></div></div></div></article>)}</div>}
+              {!recordsLoading && !recordsError && visibleRecords.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-line bg-white p-12 text-center text-sm text-navy/50">No records match this filter.</div>}
             </section>
           </div>
           <aside className="space-y-4">
             <div className="rounded-2xl border border-line bg-white p-5 shadow-sm"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project information</p><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-xs text-navy/40">Client</dt><dd className="mt-1 font-black text-navy">{project.clientName}</dd></div><div><dt className="text-xs text-navy/40">Site address</dt><dd className="mt-1 font-bold leading-5 text-navy">{project.address}</dd></div><div><dt className="text-xs text-navy/40">Records in this demo</dt><dd className="mt-1 font-black text-navy">{recordCount}</dd></div></dl></div>
-            <div className="rounded-2xl border border-blue/15 bg-blue/5 p-5"><div className="flex items-center gap-2 text-blue"><CloudOff size={17} /><p className="text-xs font-black">Local demo storage</p></div><p className="mt-2 text-xs leading-5 text-navy/55">New records are kept in this browser and remain after refresh. Cloud persistence and offline sync are Phase 2.</p></div>
+            <div className="rounded-2xl border border-blue/15 bg-blue/5 p-5"><div className="flex items-center gap-2 text-blue"><CloudOff size={17} /><p className="text-xs font-black">{appMode === 'cloud' ? 'Cloud pilot storage' : 'Local demo storage'}</p></div><p className="mt-2 text-xs leading-5 text-navy/55">{appMode === 'cloud' ? 'Records upload to the private pilot workspace for the signed-in account. Offline sync and production retention are not enabled.' : 'New records are kept in this browser and remain after refresh. Cloud persistence and offline sync are not connected in demo mode.'}</p></div>
           </aside>
         </div>}
 
@@ -95,6 +111,6 @@ export default function ProjectPage() {
         {activeTab === 'team' && <section className="mt-6 max-w-3xl" role="tabpanel" aria-label="Project team"><div className="rounded-2xl border border-line bg-white p-5 shadow-sm sm:p-6"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue">Project team</p><h2 className="mt-2 text-2xl font-black text-navy">People capturing the detail</h2><p className="mt-1 text-sm text-navy/50">Sample roles for this client demonstration.</p></div><div className="mt-6 divide-y divide-line">{team.map(member => <div key={member.id} className="flex items-center gap-3 py-4 first:pt-0 last:pb-0"><span className="grid h-10 w-10 place-items-center rounded-full bg-blue/10 text-xs font-black text-blue">{member.initials}</span><div className="flex-1"><p className="text-sm font-black text-navy">{member.name}</p><p className="mt-0.5 text-xs text-navy/45">{member.role}</p></div><span className="flex items-center gap-2 text-xs font-bold text-navy/50"><span className={'h-2 w-2 rounded-full ' + (member.status === 'On site' ? 'bg-emerald-500' : 'bg-navy/20')} />{member.status}</span></div>)}</div><div className="mt-6 flex items-start gap-3 rounded-xl bg-canvas p-4 text-xs leading-5 text-navy/55"><Users size={16} className="mt-0.5 shrink-0 text-blue" />Team accounts and permissions are intentionally outside this lightweight prototype.</div></div></section>}
       </div>
     </div>
-    {capture && <CaptureSheet projectId={project.id} onClose={() => setCapture(false)} onSaved={handleSaved} />}
+    {capture && <CaptureSheet projectId={project.id} cloudMode={appMode === 'cloud'} onClose={() => setCapture(false)} onSave={handleSaved} />}
   </AppShell>;
 }
