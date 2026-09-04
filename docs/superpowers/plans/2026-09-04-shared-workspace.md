@@ -110,6 +110,7 @@ git commit -m "feat: define SiteSnap demo and cloud runtime modes"
 - Create: `supabase/seed.sql`
 - Create: `supabase/tests/shared_workspace.sql`
 - Create: `src/types/database.ts`
+- Modify: `package.json` and `package-lock.json` to pin the Supabase CLI used for schema work
 
 **Interfaces:**
 - Produces tables `profiles`, `workspaces`, `workspace_members`, `projects`, and `photo_records`.
@@ -118,13 +119,13 @@ git commit -m "feat: define SiteSnap demo and cloud runtime modes"
 
 - [ ] **Step 1: Check the installed Supabase CLI before creating schema files.**
 
-Run: `supabase --version` and `supabase migration new --help`.
+Run: `npm.cmd exec -- supabase --version` and `npm.cmd exec -- supabase migration new --help`.
 
 If the CLI is unavailable, stop this task and report that the user must install/authenticate the CLI before schema work can be verified. Do not create a hand-named migration file.
 
 - [ ] **Step 2: Create the migration with the CLI.**
 
-Run: `supabase migration new sitesnap_shared_workspace`.
+Run: `npm.cmd exec -- supabase migration new sitesnap_shared_workspace`.
 
 Edit the generated migration file under `supabase/migrations/` with this schema:
 
