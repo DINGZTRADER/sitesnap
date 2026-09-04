@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react';
+import { getMagicLinkRedirectUrl } from '@/lib/auth-redirect';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getRuntimeMode } from '@/lib/runtime-mode';
 
@@ -33,15 +34,12 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    const next = new URLSearchParams(window.location.search).get('next');
-    const safeNext = next?.startsWith('/') && !next.startsWith('//') ? next : '/';
-
     try {
       const supabase = createSupabaseBrowserClient();
       const { error: signInError } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+          emailRedirectTo: getMagicLinkRedirectUrl(window.location.origin),
         },
       });
 
