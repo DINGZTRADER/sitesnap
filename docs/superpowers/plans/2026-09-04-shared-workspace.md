@@ -92,7 +92,7 @@ Expected: all existing evidence tests plus the two runtime-mode tests pass.
 
 - [ ] **Step 5: Make the test script discover both current and future unit tests.**
 
-Change the script to `node --experimental-strip-types --test tests` and run `npm.cmd test` on Windows to confirm Node discovers both `.test.ts` files without shell glob expansion.
+On Windows with the repository's current Node version, use the cross-platform-compatible script `node --experimental-strip-types --test tests/*.test.ts` and run `npm.cmd test` to confirm Node discovers both current `.test.ts` files. On platforms where Node accepts directory discovery directly, `node --experimental-strip-types --test tests` is equivalent.
 
 - [ ] **Step 6: Commit the runtime boundary.**
 
