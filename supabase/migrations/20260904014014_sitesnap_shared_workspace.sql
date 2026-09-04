@@ -44,7 +44,7 @@ create table public.photo_records (
   tags text[] not null default '{}',
   note text not null default '',
   stage text check (stage in ('before', 'after')),
-  paired_photo_id uuid references public.photo_records(id) on delete set null,
+  paired_photo_id uuid,
   created_at timestamptz not null default now()
 );
 
@@ -55,7 +55,7 @@ alter table public.photo_records
   add constraint paired_photo_same_project
   foreign key (paired_photo_id, project_id)
   references public.photo_records(id, project_id)
-  on delete set null;
+  on delete restrict;
 
 create index workspace_members_user_id_idx on public.workspace_members(user_id);
 create index projects_workspace_id_idx on public.projects(workspace_id);
@@ -78,6 +78,26 @@ create trigger projects_set_updated_at
 before update on public.projects
 for each row
 execute function public.set_projects_updated_at();
+
+create or replace function public.clear_photo_pair_reference()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  update public.photo_records
+  set paired_photo_id = null
+  where paired_photo_id = old.id;
+  return old;
+end;
+$$;
+
+revoke all on function public.clear_photo_pair_reference() from public;
+
+create trigger photo_records_clear_pair_reference
+before delete on public.photo_records
+for each row
+execute function public.clear_photo_pair_reference();
 
 alter table public.profiles enable row level security;
 alter table public.workspaces enable row level security;
@@ -132,38 +152,43 @@ for insert
 to authenticated
 with check (owner_id = (select auth.uid()));
 
-create policy "authenticated members can update workspaces"
+create policy "workspace owners can update workspaces"
 on public.workspaces
 for update
 to authenticated
 using (
-  exists (
+  owner_id = (select auth.uid())
+  and exists (
     select 1
     from public.workspace_members as wm
     where wm.workspace_id = workspaces.id
       and wm.user_id = (select auth.uid())
+      and wm.role = 'owner'
   )
 )
 with check (
   owner_id = (select auth.uid())
-  or exists (
+  and exists (
     select 1
     from public.workspace_members as wm
     where wm.workspace_id = workspaces.id
       and wm.user_id = (select auth.uid())
+      and wm.role = 'owner'
   )
 );
 
-create policy "authenticated members can delete workspaces"
+create policy "workspace owners can delete workspaces"
 on public.workspaces
 for delete
 to authenticated
 using (
-  exists (
+  owner_id = (select auth.uid())
+  and exists (
     select 1
     from public.workspace_members as wm
     where wm.workspace_id = workspaces.id
       and wm.user_id = (select auth.uid())
+      and wm.role = 'owner'
   )
 );
 
@@ -190,12 +215,30 @@ with check (
   )
 );
 
-create policy "authenticated users can update their membership"
+create policy "workspace owners can update their owner membership"
 on public.workspace_members
 for update
 to authenticated
-using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
+using (
+  (select auth.uid()) = user_id
+  and role = 'owner'
+  and exists (
+    select 1
+    from public.workspaces as w
+    where w.id = workspace_members.workspace_id
+      and w.owner_id = (select auth.uid())
+  )
+)
+with check (
+  (select auth.uid()) = user_id
+  and role = 'owner'
+  and exists (
+    select 1
+    from public.workspaces as w
+    where w.id = workspace_members.workspace_id
+      and w.owner_id = (select auth.uid())
+  )
+);
 
 create policy "authenticated users can delete their membership"
 on public.workspace_members
