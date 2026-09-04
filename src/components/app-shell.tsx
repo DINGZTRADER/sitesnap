@@ -1,16 +1,51 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Activity, ArrowUpRight, Bell, Camera, CheckCircle2, ChevronRight, CloudOff, FolderKanban, LayoutDashboard, Plus, Search, Users } from 'lucide-react';
 import { projects, photos, team } from '@/lib/mock-data';
 import { PricingPanel } from '@/components/pricing-panel';
 import { PhotoImage } from '@/components/photo-image';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { getRuntimeMode } from '@/lib/runtime-mode';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const runtimeMode = getRuntimeMode({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  const isCloud = runtimeMode === 'cloud';
+  const [cloudUser, setCloudUser] = useState<{ email?: string | null } | null>(null);
   const currentProjectId = pathname.startsWith('/projects/') ? pathname.split('/')[2] : projects[0].id;
+
+  useEffect(() => {
+    if (!isCloud) return;
+
+    const supabase = createSupabaseBrowserClient();
+    let mounted = true;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setCloudUser(data.user ? { email: data.user.email } : null);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setCloudUser(session?.user ? { email: session.user.email } : null);
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [isCloud]);
+
+  async function handleSignOut() {
+    await createSupabaseBrowserClient().auth.signOut();
+    router.replace('/login');
+  }
+
+  const displayName = isCloud ? cloudUser?.email?.split('@')[0] || 'Signed-in pilot' : 'Liam Cooper';
+  const initials = displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
   const navItems = [
     { href: '/', label: 'Overview', icon: LayoutDashboard, active: pathname === '/' },
     { href: '/#projects', label: 'Projects', icon: FolderKanban, active: pathname.startsWith('/projects/') },
@@ -36,11 +71,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black text-white/80">Demo workspace</p>
-            <CloudOff size={15} className="text-lime" />
+            <p className="text-xs font-black text-white/80">{isCloud ? (cloudUser ? 'Cloud pilot · synced' : 'Sign in to sync across devices') : 'Demo workspace'}</p>
+            {isCloud ? <span className="h-2 w-2 rounded-full bg-lime" /> : <CloudOff size={15} className="text-lime" />}
           </div>
-          <p className="mt-2 text-xs leading-5 text-white/50">Local records only. Cloud sync is not connected.</p>
-          <span className="mt-3 inline-flex rounded-full bg-lime/15 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-lime">Prototype</span>
+          <p className="mt-2 text-xs leading-5 text-white/50">{isCloud ? 'Sites and records use the hosted pilot workspace.' : 'Local records only. Cloud sync is not connected.'}</p>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="inline-flex rounded-full bg-lime/15 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-lime">{isCloud ? 'Pilot' : 'Prototype'}</span>
+            {isCloud && cloudUser && <button type="button" onClick={handleSignOut} className="text-[10px] font-black text-white/55 transition hover:text-white">Sign out</button>}
+          </div>
         </div>
         <div className="mt-auto rounded-2xl bg-blue p-4 shadow-lg shadow-black/15">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">Standard company</p>
@@ -63,10 +101,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button type="button" aria-label="Search" className="hidden rounded-xl border border-line p-2.5 text-navy/55 transition hover:border-blue/30 hover:text-blue sm:block"><Search size={17} /></button>
             <button type="button" aria-label="Notifications" className="rounded-xl border border-line p-2.5 text-navy/55 transition hover:border-blue/30 hover:text-blue"><Bell size={17} /></button>
             <div className="flex items-center gap-2 border-l border-line pl-2 sm:pl-3">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f4d35e] text-xs font-black text-navy">LC</span>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f4d35e] text-xs font-black text-navy">{initials}</span>
               <div className="hidden md:block">
-                <p className="text-xs font-black">Liam Cooper</p>
-                <p className="text-[10px] text-navy/45">Site Manager</p>
+                <p className="max-w-32 truncate text-xs font-black">{displayName}</p>
+                <p className="text-[10px] text-navy/45">{isCloud ? 'Cloud pilot' : 'Site Manager'}</p>
               </div>
             </div>
           </div>
